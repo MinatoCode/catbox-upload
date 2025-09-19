@@ -1,6 +1,7 @@
 // server.js
 const express = require("express");
 const fetch = require("node-fetch");
+const FormData = require("form-data");
 
 const app = express();
 const PORT = 3000;
@@ -18,18 +19,37 @@ app.get("/upload", async (req, res) => {
   }
 
   try {
-    const formData = new URLSearchParams();
-    formData.append("reqtype", "urlupload");
-    formData.append("url", url);
+    // Download the file from the given URL with browser headers
+    const fileRes = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+          "AppleWebKit/537.36 (KHTML, like Gecko) " +
+          "Chrome/120.0.0.0 Safari/537.36"
+      }
+    });
 
-    const response = await fetch(CATBOX_API, {
+    if (!fileRes.ok) throw new Error(`Failed to fetch file: ${fileRes.statusText}`);
+
+    const buffer = await fileRes.buffer();
+
+    // Prepare form data for Catbox
+    const formData = new FormData();
+    formData.append("reqtype", "fileupload");
+    formData.append("fileToUpload", buffer, {
+      filename: "upload", // Catbox doesn’t care about real filename
+      contentType: fileRes.headers.get("content-type") || "application/octet-stream"
+    });
+
+    // Upload to Catbox
+    const uploadRes = await fetch(CATBOX_API, {
       method: "POST",
       body: formData
     });
 
-    const text = await response.text();
+    const text = await uploadRes.text();
 
-    if (response.ok && text.startsWith("http")) {
+    if (uploadRes.ok && text.startsWith("http")) {
       res.json({
         author: "minatocodes",
         success: true,
@@ -54,4 +74,3 @@ app.get("/upload", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
-    

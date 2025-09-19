@@ -2,13 +2,14 @@
 const express = require("express");
 const fetch = require("node-fetch");
 const FormData = require("form-data");
+const path = require("path");
 
 const app = express();
 const PORT = 3000;
 const CATBOX_API = "https://catbox.moe/user/api.php";
 
 app.get("/upload", async (req, res) => {
-  const { url } = req.query;
+  let { url } = req.query;
 
   if (!url) {
     return res.status(400).json({
@@ -19,7 +20,10 @@ app.get("/upload", async (req, res) => {
   }
 
   try {
-    // Download the file into memory (with headers for FB/Discord CDNs)
+    // ✅ Only strip trailing dl=1 if present
+    url = url.replace(/(\?|&)dl=1$/, "");
+
+    // Download file with spoofed headers
     const fileRes = await fetch(url, {
       headers: {
         "User-Agent":
@@ -34,12 +38,28 @@ app.get("/upload", async (req, res) => {
 
     const buffer = await fileRes.buffer();
 
+    // Try to detect extension from URL or Content-Type
+    let filename = "upload";
+    const contentType = fileRes.headers.get("content-type") || "";
+
+    if (url.includes(".")) {
+      filename += path.extname(url.split("?")[0]);
+    } else if (contentType.includes("image/jpeg")) {
+      filename += ".jpg";
+    } else if (contentType.includes("image/png")) {
+      filename += ".png";
+    } else if (contentType.includes("video/mp4")) {
+      filename += ".mp4";
+    } else {
+      filename += ".bin"; // fallback
+    }
+
     // Build form for Catbox upload
     const formData = new FormData();
     formData.append("reqtype", "fileupload");
     formData.append("fileToUpload", buffer, {
-      filename: "upload.jpg", // could improve by detecting extension
-      contentType: fileRes.headers.get("content-type") || "application/octet-stream"
+      filename,
+      contentType: contentType || "application/octet-stream"
     });
 
     // Upload to Catbox

@@ -9,6 +9,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "node-fetch": "^2.7.0",
-    "form-data": "^4.0.0"
+    "form-data": "^4.0.0",
+    "formdata-node": "^4.4.1"
   }
 }

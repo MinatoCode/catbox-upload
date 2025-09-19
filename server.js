@@ -20,10 +20,12 @@ app.get("/upload", async (req, res) => {
   }
 
   try {
-    // ✅ Only strip trailing dl=1 if present
-    url = url.replace(/(\?|&)dl=1$/, "");
+    // ✅ Handle Express splitting query by "&"
+    if (Array.isArray(url)) {
+      url = url.join("&");
+    }
 
-    // Download file with spoofed headers
+    // Download file (dl=1 will just give us the binary directly)
     const fileRes = await fetch(url, {
       headers: {
         "User-Agent":
@@ -34,13 +36,15 @@ app.get("/upload", async (req, res) => {
       }
     });
 
-    if (!fileRes.ok) throw new Error(`Failed to fetch file: ${fileRes.status} ${fileRes.statusText}`);
+    if (!fileRes.ok) {
+      throw new Error(`Failed to fetch file: ${fileRes.status} ${fileRes.statusText}`);
+    }
 
     const buffer = await fileRes.buffer();
 
-    // Try to detect extension from URL or Content-Type
-    let filename = "upload";
+    // Detect extension
     const contentType = fileRes.headers.get("content-type") || "";
+    let filename = "upload";
 
     if (url.includes(".")) {
       filename += path.extname(url.split("?")[0]);
@@ -48,13 +52,15 @@ app.get("/upload", async (req, res) => {
       filename += ".jpg";
     } else if (contentType.includes("image/png")) {
       filename += ".png";
+    } else if (contentType.includes("image/gif")) {
+      filename += ".gif";
     } else if (contentType.includes("video/mp4")) {
       filename += ".mp4";
     } else {
       filename += ".bin"; // fallback
     }
 
-    // Build form for Catbox upload
+    // Upload to Catbox
     const formData = new FormData();
     formData.append("reqtype", "fileupload");
     formData.append("fileToUpload", buffer, {
@@ -62,7 +68,6 @@ app.get("/upload", async (req, res) => {
       contentType: contentType || "application/octet-stream"
     });
 
-    // Upload to Catbox
     const uploadRes = await fetch(CATBOX_API, {
       method: "POST",
       body: formData
@@ -93,5 +98,6 @@ app.get("/upload", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
+  
